@@ -181,6 +181,14 @@
           "type": "string",
           "description": "Comma-separated list of file extensions to ignore during recursive selection. Example: 'png,jpg,jpeg,gif,svg'",
           "default": "png,jpg,jpeg,gif,svg"
+        },
+        "files2prompt.excludedPaths": {
+          "type": "array",
+          "description": "List of file and directory names to exclude. Example: ['__pycache__', '.DS_Store']",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       }
     }
