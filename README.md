@@ -16,6 +16,7 @@ Copy file contents in XML format for LLM prompts effortlessly.
 - **Git Ignore Support**: Automatically ignores files and directories specified in your .gitignore.
 - **Selection History**: Quickly switch between sets of previously selected files.
 - **Paste XML Response**: If XML is pasted into the editor in the same format as the copied output, the files will automatically be updated or created in your workspace. This allows for rapid iteration. See [recommended workflow](#recommended-workflow) for more information.
+- **Exclude Specific Paths**: Exclude specific files and directories by name using the `files2prompt.excludedPaths` setting.
 
 ## Installation
 
@@ -83,6 +84,14 @@ Always provide full code listings. You only need to include files that have chan
 
 See recommended system message above.
 
+### Exclude Specific Paths:
+
+1. Open Settings:
+   - Press `Ctrl+,` (`Cmd+,` on macOS).
+2. Navigate to Extensions > Files2Prompt.
+3. Enter the names of files and directories you want to exclude in the Excluded Paths field. Example: `['__pycache__', '.DS_Store']`
+4. These files and directories will be excluded from the file tree view and copy operations.
+
 ## Configuration
 
 ### Customizing Keyboard Shortcuts
@@ -101,6 +110,14 @@ You can customize the keyboard shortcuts for refreshing and copying files:
 2. Navigate to Extensions > Files2Prompt.
 3. Enter your desired system message in the System Message field.
 4. If left empty, no system message will be included in the copied output.
+
+### Excluding Specific Paths
+
+1. Open Settings:
+   - Press `Ctrl+,` (`Cmd+,` on macOS).
+2. Navigate to Extensions > Files2Prompt.
+3. Enter the names of files and directories you want to exclude in the Excluded Paths field. Example: `['__pycache__', '.DS_Store']`
+4. These files and directories will be excluded from the file tree view and copy operations.
 
 ## Example Output
 

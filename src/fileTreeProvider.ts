@@ -16,12 +16,14 @@ export class FileTreeProvider
   private checkedItems: Map<string, vscode.TreeItemCheckboxState> = new Map();
   private gitignore = ignore();
   private ignoredExtensions: Set<string> = new Set();
+  private excludedPaths: Set<string> = new Set();
   private watcher: vscode.FileSystemWatcher;
 
   constructor(workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot;
     this.loadGitignore();
     this.loadIgnoredExtensions();
+    this.loadExcludedPaths();
 
     // Create a file system watcher
     this.watcher = vscode.workspace.createFileSystemWatcher("**/*");
@@ -34,6 +36,10 @@ export class FileTreeProvider
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("files2prompt.ignoredExtensions")) {
         this.loadIgnoredExtensions();
+        this.refresh();
+      }
+      if (event.affectsConfiguration("files2prompt.excludedPaths")) {
+        this.loadExcludedPaths();
         this.refresh();
       }
     });
@@ -116,6 +122,7 @@ export class FileTreeProvider
       const extension = path.extname(entry.name).toLowerCase().replace(".", "");
       const isIgnoredExtension = this.ignoredExtensions.has(extension);
       const isGitIgnored = this.isGitIgnored(relativePath);
+      const isExcludedPath = this.isExcludedPath(entry.name);
 
       const key = fullPath;
       let checkboxState = this.checkedItems.get(key);
@@ -127,7 +134,8 @@ export class FileTreeProvider
         if (
           parentCheckboxState === vscode.TreeItemCheckboxState.Checked &&
           !isGitIgnored &&
-          !isIgnoredExtension
+          !isIgnoredExtension &&
+          !isExcludedPath
         ) {
           checkboxState = vscode.TreeItemCheckboxState.Checked;
           this.checkedItems.set(fullPath, checkboxState);
@@ -136,19 +144,21 @@ export class FileTreeProvider
         }
       }
 
-      const item = new FileItem(
-        entry.name,
-        uri,
-        isDirectory
-          ? vscode.TreeItemCollapsibleState.Collapsed
-          : vscode.TreeItemCollapsibleState.None,
-        isDirectory,
-        checkboxState,
-        isGitIgnored || isIgnoredExtension,
-        isSymbolicLink
-      );
+      if (!isExcludedPath) {
+        const item = new FileItem(
+          entry.name,
+          uri,
+          isDirectory
+            ? vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.None,
+          isDirectory,
+          checkboxState,
+          isGitIgnored || isIgnoredExtension,
+          isSymbolicLink
+        );
 
-      items.push(item);
+        items.push(item);
+      }
     }
 
     return items;
@@ -164,7 +174,8 @@ export class FileTreeProvider
     if (item.isDirectory) {
       const relativePath = path.relative(this.workspaceRoot, key);
       const isGitIgnored = this.isGitIgnored(relativePath);
-      await this.updateDirectoryCheckState(key, state, isGitIgnored);
+      const isExcludedPath = this.isExcludedPath(path.basename(key));
+      await this.updateDirectoryCheckState(key, state, isGitIgnored, isExcludedPath);
     }
 
     // Update parent directories' states
@@ -192,8 +203,8 @@ export class FileTreeProvider
       const extension = path.extname(entry.name).toLowerCase().replace(".", "");
       const isIgnoredExtension = this.ignoredExtensions.has(extension);
 
-      if (this.isGitIgnored(relativePath) || isIgnoredExtension) {
-        continue; // Skip gitignored items and ignored extensions
+      if (this.isGitIgnored(relativePath) || isIgnoredExtension || this.isExcludedPath(entry.name)) {
+        continue; // Skip gitignored items, ignored extensions, and excluded paths
       }
 
       hasNonIgnoredChild = true;
@@ -223,7 +234,8 @@ export class FileTreeProvider
   private async updateDirectoryCheckState(
     dirPath: string,
     state: vscode.TreeItemCheckboxState,
-    parentIsGitIgnored: boolean
+    parentIsGitIgnored: boolean,
+    parentIsExcludedPath: boolean
   ): Promise<void> {
     const dirEntries = await fs.promises.readdir(dirPath, {
       withFileTypes: true,
@@ -233,12 +245,13 @@ export class FileTreeProvider
       const fullPath = path.join(dirPath, entry.name);
       const relativePath = path.relative(this.workspaceRoot, fullPath);
       const isGitIgnored = this.isGitIgnored(relativePath);
+      const isExcludedPath = this.isExcludedPath(entry.name);
 
       const extension = path.extname(entry.name).toLowerCase().replace(".", "");
       const isIgnoredExtension = this.ignoredExtensions.has(extension);
 
-      if (!parentIsGitIgnored && (isGitIgnored || isIgnoredExtension)) {
-        // Skip gitignored items and ignored extensions when parent is not gitignored
+      if (!parentIsGitIgnored && !parentIsExcludedPath && (isGitIgnored || isIgnoredExtension || isExcludedPath)) {
+        // Skip gitignored items, ignored extensions, and excluded paths when parent is not gitignored or excluded
         continue;
       }
 
@@ -259,7 +272,7 @@ export class FileTreeProvider
       }
 
       if (isDirectory && !isBrokenLink) {
-        await this.updateDirectoryCheckState(fullPath, state, isGitIgnored);
+        await this.updateDirectoryCheckState(fullPath, state, isGitIgnored, isExcludedPath);
       }
     }
   }
@@ -323,6 +336,16 @@ export class FileTreeProvider
       .split(",")
       .map((ext) => ext.trim().toLowerCase());
     this.ignoredExtensions = new Set(extensionsArray);
+  }
+
+  private loadExcludedPaths() {
+    const config = vscode.workspace.getConfiguration("files2prompt");
+    const excludedPathsArray = config.get<string[]>("excludedPaths", []);
+    this.excludedPaths = new Set(excludedPathsArray);
+  }
+
+  private isExcludedPath(name: string): boolean {
+    return this.excludedPaths.has(name);
   }
 }
 
